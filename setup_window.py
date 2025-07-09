@@ -30,7 +30,7 @@ class SetupWindow:
         
     def read_rotation(self):
         """rotate.txtから回転状態を読み込み"""
-        try: 
+        try:
             with open('rotate.txt', 'r') as f:
                 return int(f.read().strip())
         except:
@@ -208,32 +208,56 @@ class SetupWindow:
         """Wi-Fi接続をテスト"""
         try:
             import requests
-            response = requests.get('https://www.google.com', timeout=10)
-            return response.status_code == 200
+            # 複数のサイトで接続テスト
+            test_urls = ['https://www.google.com', 'https://www.cloudflare.com', 'https://httpbin.org/get']
+            for url in test_urls:
+                try:
+                    response = requests.get(url, timeout=15)  # タイムアウトを10秒から15秒に延長
+                    if response.status_code == 200:
+                        return True
+                except:
+                    continue
+            return False
         except:
             return False
     
     def connect_wifi(self, ssid, password):
         """Wi-Fiに接続"""
         try:
-            # nmcliを使用してWi-Fi接続
+            # 既存の接続を削除（重複接続を避けるため）
+            try:
+                subprocess.run(['nmcli', 'connection', 'delete', ssid], 
+                             capture_output=True, timeout=10)
+            except:
+                pass
+            
+            # nmcliを使用してWi-Fi接続（タイムアウトを延長）
             if password:
                 result = subprocess.run(
                     ['nmcli', 'dev', 'wifi', 'connect', ssid, 'password', password],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=60  # 30秒から60秒に延長
                 )
             else:
                 result = subprocess.run(
                     ['nmcli', 'dev', 'wifi', 'connect', ssid],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=60  # 30秒から60秒に延長
                 )
             
-            return result.returncode == 0
-        except:
+            if result.returncode == 0:
+                print("Wi-Fi接続成功")
+                return True
+            else:
+                print(f"Wi-Fi接続失敗: {result.stderr}")
+                return False
+        except subprocess.TimeoutExpired:
+            print("Wi-Fi接続タイムアウト")
+            return False
+        except Exception as e:
+            print(f"Wi-Fi接続エラー: {e}")
             return False
     
     def complete_setup(self):
@@ -251,21 +275,42 @@ class SetupWindow:
         def connect_thread():
             # Wi-Fi接続
             if self.connect_wifi(ssid, password):
-                # 接続テスト
-                time.sleep(3)  # 接続安定化のため少し待機
-                if self.test_connection():
+                # 接続安定化のため待機時間を延長
+                self.status_label.config(text="接続確認中...")
+                for i in range(10):  # 10秒待機
+                    time.sleep(1)
+                    self.status_label.config(text=f"接続確認中...({i+1}/10)")
+                
+                # 接続テスト（複数回試行）
+                connection_success = False
+                for attempt in range(3):  # 3回試行
+                    self.status_label.config(text=f"接続テスト中...({attempt+1}/3)")
+                    if self.test_connection():
+                        connection_success = True
+                        break
+                    time.sleep(5)  # 5秒待機してリトライ
+                
+                if connection_success:
                     # setup.txtを1に更新
                     with open('setup.txt', 'w') as f:
                         f.write('1')
                     
-                    # サイネージプログラムを実行
-                    self.root.destroy()
-                    subprocess.run([sys.executable, 'signage_display.py'])
+                    self.status_label.config(text="サイネージプログラムを起動中...")
+                    
+                    # サイネージプログラムを確実に実行
+                    try:
+                        self.root.destroy()
+                        result = subprocess.run([sys.executable, 'signage_display.py'], check=True)
+                        print(f"サイネージプログラム終了コード: {result.returncode}")
+                    except subprocess.CalledProcessError as e:
+                        print(f"サイネージプログラム実行エラー: {e}")
+                        # エラー時も再試行
+                        subprocess.run([sys.executable, 'signage_display.py'])
                 else:
-                    messagebox.showerror("エラー", "インターネット接続テストに失敗しました")
+                    messagebox.showerror("エラー", "インターネット接続テストに失敗しました\n時間をおいて再度お試しください")
                     self.complete_button.config(state='normal')
             else:
-                messagebox.showerror("エラー", "Wi-Fi接続に失敗しました\nパスワードを確認してください")
+                messagebox.showerror("エラー", "Wi-Fi接続に失敗しました\nネットワーク名とパスワードを確認してください")
                 self.complete_button.config(state='normal')
             
             self.status_label.config(text="")
