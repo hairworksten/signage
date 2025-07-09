@@ -109,60 +109,42 @@ class SignageDisplay:
             except:
                 continue
         
-        # 日時表示（左上）
+        # 日時表示（左上）- フォントサイズ2倍、背景色#0e3c7f、文字色#ffffff
         self.datetime_label = tk.Label(
             self.main_frame,
             text="",
-            font=(main_font, 40, 'bold'),
-            fg='white',
-            bg='black'
+            font=(main_font, 80, 'bold'),  # フォントサイズを2倍
+            fg='#ffffff',
+            bg='#0e3c7f'
         )
         self.datetime_label.place(x=50, y=50)
         
-        # 待ち人数表示（右上）
-        self.wait_frame = tk.Frame(self.main_frame, bg='black')
-        self.wait_frame.place(x=650, y=50)
-        
-        self.wait_title = tk.Label(
-            self.wait_frame,
-            text="現在の待ち人数",
-            font=(main_font, 24, 'bold'),
-            fg='white',
-            bg='black'
-        )
-        self.wait_title.pack()
-        
+        # 待ち人数表示（右上）- 数字のみ、背景色#3e6399、文字色#c8bf43、フォントサイズ2倍、100px下に移動
         self.wait_count = tk.Label(
-            self.wait_frame,
-            text="0人",
-            font=(main_font, 64, 'bold'),
-            fg='white',
-            bg='black'
+            self.main_frame,
+            text="0",
+            font=(main_font, 128, 'bold'),  # フォントサイズを2倍
+            fg='#c8bf43',
+            bg='#3e6399'
         )
-        self.wait_count.pack()
+        self.wait_count.place(x=650, y=150)  # 100px下に移動
         
-        # 予約表示（中央）
+        # 予約表示（中央）- タイトル削除
         self.reservation_frame = tk.Frame(self.main_frame, bg='black')
         self.reservation_frame.place(x=200, y=600)
         
-        self.reservation_title = tk.Label(
-            self.reservation_frame,
-            text="本日の予約状況",
-            font=(main_font, 32, 'bold'),
-            fg='white',
-            bg='black'
-        )
-        self.reservation_title.pack(pady=(0, 30))
-        
-        # 予約リスト用のラベル（最大5件）
+        # 予約リスト用のラベル（最大5件）- 時間と人数のみ、背景色#0e3c7f、交互の文字色
         self.reservation_labels = []
         for i in range(5):
+            # 1,3,5番目は#fe924c、2,4番目は#ffffff
+            text_color = '#fe924c' if (i + 1) % 2 == 1 else '#ffffff'
+            
             label = tk.Label(
                 self.reservation_frame,
                 text="",
-                font=(main_font, 28, 'bold'),
-                fg='white',
-                bg='black'
+                font=(main_font, 111, 'bold'),  # フォントサイズ111px
+                fg=text_color,
+                bg='#0e3c7f'
             )
             label.pack(pady=8)
             self.reservation_labels.append(label)
@@ -177,7 +159,7 @@ class SignageDisplay:
             self.datetime_label.place(x=1080-350, y=1920-150)
             
             # 待ち人数表示を左下に移動
-            self.wait_frame.place(x=50, y=1920-250)
+            self.wait_count.place(x=50, y=1920-350)
             
             # 予約表示を中央上部に移動
             self.reservation_frame.place(x=200, y=200)
@@ -185,7 +167,7 @@ class SignageDisplay:
             # 通常配置
             print("通常モード: 標準ウィジェット位置")
             self.datetime_label.place(x=50, y=50)
-            self.wait_frame.place(x=650, y=50)
+            self.wait_count.place(x=650, y=150)
             self.reservation_frame.place(x=200, y=600)
     
     def load_background(self):
@@ -228,11 +210,8 @@ class SignageDisplay:
         """テキストウィジェットを最前面に配置"""
         try:
             self.datetime_label.lift()
-            self.wait_frame.lift()
-            self.wait_title.lift()
             self.wait_count.lift()
             self.reservation_frame.lift()
-            self.reservation_title.lift()
             for label in self.reservation_labels:
                 label.lift()
             print("ウィジェットを最前面に配置しました")
@@ -343,16 +322,16 @@ class SignageDisplay:
     def update_display(self):
         """表示を更新"""
         try:
-            # 待ち人数更新
-            wait_text = f"{self.now_population}人"
+            # 待ち人数更新（数字のみ）
+            wait_text = f"{self.now_population}"
             self.wait_count.config(text=wait_text)
             print(f"待ち人数表示を更新: {wait_text}")
             
-            # 予約情報更新
+            # 予約情報更新（時間と人数のみ、「〇名」形式）
             for i, label in enumerate(self.reservation_labels):
                 if i < len(self.reservations):
                     time_slot, count = self.reservations[i]
-                    reservation_text = f"{time_slot}  {count}人"
+                    reservation_text = f"{time_slot}  {count}名"
                     label.config(text=reservation_text)
                     print(f"予約{i+1}: {reservation_text}")
                 else:
