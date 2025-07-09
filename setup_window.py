@@ -15,7 +15,18 @@ class SetupWindow:
         self.root.title("初期設定")
         self.root.geometry("1080x1920")
         self.root.attributes('-fullscreen', True)
-        self.root.configure(bg='#f0f0f0')
+        self.root.attributes('-topmost', True)  # 常に最前面に表示
+        self.root.configure(bg='#f0f0f0')  # マウスカーソルは表示
+        
+        # ウィンドウの装飾を完全に削除
+        self.root.overrideredirect(True)
+        
+        # 画面全体をカバーするように設定
+        self.root.wm_attributes('-fullscreen', True)
+        
+        # フォーカスを確実に取得
+        self.root.focus_set()
+        self.root.focus_force()
         
         # 回転状態を読み込み
         self.rotation = self.read_rotation()
@@ -260,6 +271,28 @@ class SetupWindow:
             print(f"Wi-Fi接続エラー: {e}")
             return False
     
+    def launch_signage(self):
+        """サイネージプログラムを起動"""
+        try:
+            print("サイネージプログラムを起動中...")
+            
+            # 現在のウィンドウを非表示
+            self.root.withdraw()
+            
+            # 少し待機
+            time.sleep(1)
+            
+            # サイネージプログラムを起動
+            subprocess.Popen([sys.executable, 'signage_display.py'])
+            
+            # セットアップウィンドウを終了
+            self.root.quit()
+            self.root.destroy()
+            
+        except Exception as e:
+            print(f"サイネージプログラム起動エラー: {e}")
+            messagebox.showerror("エラー", f"サイネージプログラムの起動に失敗しました: {e}")
+    
     def complete_setup(self):
         """設定完了処理"""
         ssid = self.wifi_var.get()
@@ -295,17 +328,12 @@ class SetupWindow:
                     with open('setup.txt', 'w') as f:
                         f.write('1')
                     
-                    self.status_label.config(text="サイネージプログラムを起動中...")
+                    self.status_label.config(text="設定完了！サイネージを起動します...")
                     
-                    # サイネージプログラムを確実に実行
-                    try:
-                        self.root.destroy()
-                        result = subprocess.run([sys.executable, 'signage_display.py'], check=True)
-                        print(f"サイネージプログラム終了コード: {result.returncode}")
-                    except subprocess.CalledProcessError as e:
-                        print(f"サイネージプログラム実行エラー: {e}")
-                        # エラー時も再試行
-                        subprocess.run([sys.executable, 'signage_display.py'])
+                    # 2秒待機してからサイネージを起動
+                    time.sleep(2)
+                    self.launch_signage()
+                    
                 else:
                     messagebox.showerror("エラー", "インターネット接続テストに失敗しました\n時間をおいて再度お試しください")
                     self.complete_button.config(state='normal')
