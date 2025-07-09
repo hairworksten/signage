@@ -37,6 +37,10 @@ class SetupWindow:
         
         self.create_widgets()
         self.apply_rotation()
+        
+        # 前回接続したWi-Fiに自動接続を試行
+        self.try_auto_connect()
+        
         self.scan_wifi()
         
     def read_rotation(self):
@@ -47,7 +51,30 @@ class SetupWindow:
         except:
             return 0
     
-    def save_rotation(self):
+    def save_network_info(self, ssid, password):
+        """ネットワーク情報をnetwork.txtに保存"""
+        try:
+            with open('network.txt', 'w', encoding='utf-8') as f:
+                f.write(f"{ssid}\n{password}")
+            print(f"ネットワーク情報を保存: {ssid}")
+        except Exception as e:
+            print(f"ネットワーク情報保存エラー: {e}")
+    
+    def load_network_info(self):
+        """network.txtからネットワーク情報を読み込み"""
+        try:
+            if os.path.exists('network.txt'):
+                with open('network.txt', 'r', encoding='utf-8') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 2:
+                        ssid = lines[0]
+                        password = lines[1]
+                        return ssid, password
+                    elif len(lines) == 1:
+                        return lines[0], ""  # パスワードなし
+        except Exception as e:
+            print(f"ネットワーク情報読み込みエラー: {e}")
+        return None, None
         """rotate.txtに回転状態を保存"""
         with open('rotate.txt', 'w') as f:
             f.write(str(self.rotation))
@@ -215,6 +242,52 @@ class SetupWindow:
         
         threading.Thread(target=scan_thread, daemon=True).start()
     
+    def try_auto_connect(self):
+        """前回接続したWi-Fiに自動接続を試行"""
+        def auto_connect_thread():
+            try:
+                self.status_label.config(text="前回のWi-Fi接続を確認中...")
+                
+                # 保存されたネットワーク情報を読み込み
+                saved_ssid, saved_password = self.load_network_info()
+                
+                if saved_ssid:
+                    self.status_label.config(text=f"保存されたネットワークに接続中: {saved_ssid}")
+                    
+                    # 保存されたネットワークに接続を試行
+                    if self.connect_wifi(saved_ssid, saved_password):
+                        # 接続成功後、インターネット接続をテスト
+                        self.status_label.config(text="インターネット接続をテスト中...")
+                        time.sleep(3)
+                        
+                        if self.test_connection():
+                            # 接続成功 - 自動的にサイネージを起動
+                            self.status_label.config(text="自動接続成功！サイネージを起動します...")
+                            
+                            # setup.txtを1に更新
+                            with open('setup.txt', 'w') as f:
+                                f.write('1')
+                            
+                            time.sleep(2)
+                            self.launch_signage()
+                            return
+                        else:
+                            self.status_label.config(text="インターネット接続が不安定です")
+                    else:
+                        self.status_label.config(text="保存されたネットワークに接続できませんでした")
+                else:
+                    self.status_label.config(text="保存されたネットワーク情報がありません")
+                
+                # 自動接続に失敗した場合は手動設定画面を表示
+                time.sleep(2)
+                self.status_label.config(text="Wi-Fi設定が必要です")
+                
+            except Exception as e:
+                print(f"自動接続エラー: {e}")
+                self.status_label.config(text="Wi-Fi設定が必要です")
+        
+        threading.Thread(target=auto_connect_thread, daemon=True).start()
+    
     def test_connection(self):
         """Wi-Fi接続をテスト"""
         try:
@@ -324,6 +397,9 @@ class SetupWindow:
                     time.sleep(5)  # 5秒待機してリトライ
                 
                 if connection_success:
+                    # ネットワーク情報を保存
+                    self.save_network_info(ssid, password)
+                    
                     # setup.txtを1に更新
                     with open('setup.txt', 'w') as f:
                         f.write('1')
